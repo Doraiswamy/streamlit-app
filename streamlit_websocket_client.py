@@ -1,15 +1,23 @@
 import streamlit as st
-import requests
+import aiohttp
+import asyncio
 
 st.title('LLM Response Generator')
 
 # Text input from the user
 user_input = st.text_input('Enter your text here:')
 
+async def fetch_llm_response(payload):
+    url = 'https://5n9abgtpde.execute-api.us-east-1.amazonaws.com/generateLLMresponse'
+    headers = {'Content-Type': 'application/json'}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, headers=headers) as response:
+            response.raise_for_status()
+            return await response.json()
+
 # When the user clicks the button
 if st.button('Generate Response'):
     if user_input.strip():
-        url = 'https://5n9abgtpde.execute-api.us-east-1.amazonaws.com/generateLLMresponse'
         payload = {
           "inputMode": "Text",
           "sessionId": "5fed3c93-fa7b-413b-941c-88c209129444",
@@ -77,25 +85,20 @@ if st.button('Generate Response'):
           ]
         }
 
-        try:
-            # Sending a POST request to the API
-            headers = {'Content-Type': 'application/json'}
-            response = requests.post(url, json=payload, headers=headers)
-            response.raise_for_status()  # Raise an error for bad status codes
+        with st.spinner('Generating response...'):
+            try:
+                # Use asyncio to run the asynchronous function
+                result = asyncio.run(fetch_llm_response(payload))
 
-            # Assuming the API returns JSON
-            result = response.json()
+                content_message = result["messages"][0]["content"]
 
-            content_message = result["messages"][0]["content"]
+                # Display the content in Streamlit
+                st.title("LLM Response")
+                st.write(content_message)
 
-            # Display the content in Streamlit
-            st.title("LLM Response")
-            st.write(content_message)
-
-        except requests.exceptions.HTTPError as http_err:
-            st.error(f'HTTP error occurred: {http_err}')
-        except Exception as err:
-            st.error(f'An error occurred: {err}')
+            except aiohttp.ClientResponseError as http_err:
+                st.error(f'HTTP error occurred: {http_err}')
+            except Exception as err:
+                st.error(f'An error occurred: {err}')
     else:
         st.warning('Please enter some text.')
-
