@@ -2,7 +2,7 @@ import streamlit as st
 import aiohttp
 import asyncio
 
-st.title('LLM Response Generator')
+st.title('NEC ARC MSBU Agent')
 
 # Text input from the user
 user_input = st.text_input('Enter your text here:')
