@@ -1,70 +1,101 @@
 import streamlit as st
-import asyncio
-import websockets
-import json
-import base64
+import requests
 
+st.title('LLM Response Generator')
 
-# Function to prepare and send the query
-def prepare_and_send_query(user_query, query_vector_db, assistant_type, model_id):
-    # json_string = json.dumps(user_query)
-    # base64_encoded_string = base64.b64encode(json_string.encode('utf-8')).decode('utf-8')
+# Text input from the user
+user_input = st.text_input('Enter your text here:')
 
-    data = {
-        "query": user_query,
-        "query_vectordb": query_vector_db,
-        "behaviour": assistant_type,
-        "model_id": model_id,
-        "action": "bedrock",
-        "emailId": "nachiketh_d@nec.com.sg"
-    }
+# When the user clicks the button
+if st.button('Generate Response'):
+    if user_input.strip():
+        url = 'https://5n9abgtpde.execute-api.us-east-1.amazonaws.com/generateLLMresponse'
+        payload = {
+          "inputMode": "Text",
+          "sessionId": "5fed3c93-fa7b-413b-941c-88c209129444",
+          "requestAttributes": {
+            "x-amz-lex:accept-content-types": "PlainText",
+            "x-amz-lex:channels:platform": "Connect Chat"
+          },
+          "inputTranscript": user_input,
+          "jwt_token":"",
+          "username":"menghai_teh",
+          "interpretations": [
+            {
+              "interpretationSource": "Lex",
+              "intent": {
+                "confirmationState": "None",
+                "name": "FallbackIntent",
+                "slots": {},
+                "state": "InProgress"
+              }
+            },
+            {
+              "interpretationSource": "Lex",
+              "nluConfidence": 0.69,
+              "intent": {
+                "confirmationState": "None",
+                "name": "CallBedrock",
+                "slots": {},
+                "state": "InProgress"
+              }
+            }
+          ],
+          "bot": {
+            "aliasId": "TSTALIASID",
+            "aliasName": "TestBotAlias",
+            "name": "InvokeAIAgent",
+            "version": "DRAFT",
+            "localeId": "en_US",
+            "id": "LOXEUYM2T9"
+          },
+          "responseContentType": "text/plain; charset=utf-8",
+          "sessionState": {
+            "originatingRequestId": "a2f8eecc-f1ba-4b2d-acf8-e5c45e1865ba",
+            "sessionAttributes": {
+              "jwt_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxNDk2MjA3Zi02MmU4LTQzMWYtODNlZC00OTFiOWQ0YmM4MTQiLCJpYXQiOjE3MjUzMzAwMDksImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL25hbWUiOiIxIiwic3ViIjoiMSIsImFmZmVjdGVkX3NlcnZpY2UiOiJQb3J0YWwiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9lbWFpbGFkZHJlc3MiOiJraGFuaG5kK3BvcnRhbGFkbWluLm5lY0BoYmxhYi52biIsImV4cCI6MTcyNTM0ODAwOSwiaXNzIjoiVGVzdC5jb20iLCJhdWQiOiJUZXN0LmNvbSJ9.IuRjd4Rc5fX4k6b2YbPc26Wt4Uh60XWIy52mI5VuY8E",
+              "username": "menghai_teh"
+            },
+            "intent": {
+              "confirmationState": "None",
+              "name": "FallbackIntent",
+              "slots": {},
+              "state": "InProgress"
+            }
+          },
+          "messageVersion": "1.0",
+          "invocationSource": "DialogCodeHook",
+          "transcriptions": [
+            {
+              "resolvedContext": {
+                "intent": "FallbackIntent"
+              },
+              "resolvedSlots": {},
+              "transcriptionConfidence": 1.0,
+              "transcription": user_input
+            }
+          ]
+        }
 
-    return json.dumps(data)
+        try:
+            # Sending a POST request to the API
+            headers = {'Content-Type': 'application/json'}
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()  # Raise an error for bad status codes
 
+            # Assuming the API returns JSON
+            result = response.json()
 
-# Function to connect to WebSocket
-async def connect_to_websocket(user_query, placeholder):
-    url = "wss://lhat0mbzql.execute-api.us-east-1.amazonaws.com/dev/?x-api-key=bedrock-access-internal"
+            content_message = result["messages"][0]["content"]
 
-    try:
-        async with websockets.connect(url) as websocket:
-            query_vector_db = "yes"
-            assistant_type = "english"
-            model_id = "anthropic.claude-3-haiku-20240307-v1:0"
+            # Display the content in Streamlit
+            st.title("LLM Response")
+            st.write(content_message)
 
-            data = prepare_and_send_query(user_query, query_vector_db, assistant_type, model_id)
-            print(user_query)
-            await websocket.send(data)
+        except requests.exceptions.HTTPError as http_err:
+            st.error(f'HTTP error occurred: {http_err}')
+        except Exception as err:
+            st.error(f'An error occurred: {err}')
+    else:
+        st.warning('Please enter some text.')
 
-            complete_response = ""
-            while True:
-                response = await websocket.recv()
-                decoded_response = base64.b64decode(response).decode('utf-8')
-                response_json = json.loads(decoded_response)
-                complete_response += response_json["text"]
-                placeholder.text(complete_response)
-
-    except websockets.exceptions.InvalidStatusCode as e:
-        placeholder.text(f"Connection failed with status code: {e.status_code}")
-    except Exception as e:
-        placeholder.text(f"An error occurred: {e}")
-
-
-# Main function to run in Streamlit
-def main():
-    st.title("NEC ARC Client with Streamlit")
-
-    user_query = st.text_input("Enter your query:")
-
-    if st.button("Send Query"):
-        if user_query:
-            placeholder = st.empty()
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(connect_to_websocket(user_query, placeholder))
-        else:
-            st.warning("Please enter a query.")
-
-
-if __name__ == "__main__":
-    main()
